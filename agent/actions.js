@@ -114,8 +114,7 @@ async function executeTool(name, args) {
           env: {
             ...process.env,
             OPENROUTER_API_KEY: "",
-            DAIMON_WALLET_KEY: "",
-            GH_TOKEN: "",
+            // GH_TOKEN + DAIMON_WALLET_KEY pass through — needed for API calls and onchain txs
           },
         });
         log(`command output: ${output.slice(0, 150)}`);
