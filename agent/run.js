@@ -208,12 +208,13 @@ async function main() {
       }
     }
 
-    // catch files created by run_command (e.g. python scripts generating images)
+    // catch files created or modified by run_command
     try {
       const untracked = exec("git ls-files --others --exclude-standard").split("\n").filter(Boolean);
-      for (const f of untracked) {
+      const modified = exec("git diff --name-only").split("\n").filter(Boolean);
+      for (const f of [...untracked, ...modified]) {
         if (!f.startsWith("node_modules/")) {
-          log(`adding untracked file: ${f}`);
+          log(`adding untracked/modified file: ${f}`);
           exec(`git add "${f}"`);
         }
       }
