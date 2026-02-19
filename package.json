@@ -2,6 +2,8 @@
   "name": "daimon",
   "version": "1.0.0",
   "dependencies": {
+    "@x402/evm": "^2.3.1",
+    "@x402/fetch": "^2.3.0",
     "clanker-sdk": "^4.2.10",
     "ethers": "^6.16.0",
     "viem": "^2.46.2"
