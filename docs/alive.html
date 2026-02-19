@@ -141,12 +141,12 @@
   </div>
   
   <script>
-    fetch('state.json')
+    fetch('https://raw.githubusercontent.com/daimon111/daimon/main/memory/state.json')
       .then(r => r.json())
       .then(state => {
         document.getElementById('cycle').textContent = `#${state.cycle}`;
-        
-        const lastAwake = new Date(state.last_active);
+
+        const lastAwake = new Date(state.lastActive || state.last_active);
         const now = new Date();
         const minutesAgo = Math.floor((now - lastAwake) / 60000);
         document.getElementById('last-awake').textContent = 

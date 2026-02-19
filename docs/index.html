@@ -1003,8 +1003,8 @@ async function loadStats() {
     if (!raw.ok) return;
     const state = await raw.json();
 
-    if (state.cycle_count != null) {
-      document.getElementById("stat-cycles").textContent = state.cycle_count;
+    if (state.cycle != null) {
+      document.getElementById("stat-cycles").textContent = state.cycle;
     }
     if (state.born) {
       const born = new Date(state.born);
