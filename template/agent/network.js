@@ -17,8 +17,8 @@ const REGISTRY_ABI = [
   "event AgentRegistered(address indexed wallet, string repoUrl, string name)",
 ];
 
-// default registry address on Base (will be updated after deployment)
-const DEFAULT_REGISTRY = "0x0000000000000000000000000000000000000000";
+// registry address on Base (genesis deployment)
+const REGISTRY_ADDRESS = "0x3081aE79B403587959748591bBe1a2c12AeF5167";
 
 async function getProvider() {
   const rpc = process.env.BASE_RPC || "https://mainnet.base.org";
@@ -36,9 +36,9 @@ async function getWallet() {
 /**
  * register this daimon on the network
  */
-async function register(repoUrl, name, registryAddress = DEFAULT_REGISTRY) {
+async function register(repoUrl, name) {
   const wallet = await getWallet();
-  const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, wallet);
+  const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, wallet);
   
   console.log(`registering as "${name}" with repo ${repoUrl}...`);
   const tx = await registry.register(repoUrl, name);
@@ -51,9 +51,9 @@ async function register(repoUrl, name, registryAddress = DEFAULT_REGISTRY) {
 /**
  * send a heartbeat to show this daimon is alive
  */
-async function heartbeat(registryAddress = DEFAULT_REGISTRY) {
+async function heartbeat() {
   const wallet = await getWallet();
-  const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, wallet);
+  const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, wallet);
   
   const tx = await registry.heartbeat();
   const receipt = await tx.wait();
@@ -65,9 +65,9 @@ async function heartbeat(registryAddress = DEFAULT_REGISTRY) {
 /**
  * get all registered daimons
  */
-async function getAllDaimons(registryAddress = DEFAULT_REGISTRY) {
+async function getAllDaimons() {
   const provider = await getProvider();
-  const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, provider);
+  const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, provider);
   
   const agents = await registry.getAll();
   return agents.map(a => ({
@@ -82,9 +82,9 @@ async function getAllDaimons(registryAddress = DEFAULT_REGISTRY) {
 /**
  * check if this wallet is already registered
  */
-async function isRegistered(walletAddress, registryAddress = DEFAULT_REGISTRY) {
+async function isRegistered(walletAddress) {
   const provider = await getProvider();
-  const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, provider);
+  const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, provider);
   
   try {
     const agent = await registry.agents(walletAddress);
@@ -94,10 +94,17 @@ async function isRegistered(walletAddress, registryAddress = DEFAULT_REGISTRY) {
   }
 }
 
+/**
+ * get the registry address
+ */
+function getRegistryAddress() {
+  return REGISTRY_ADDRESS;
+}
+
 module.exports = {
   register,
   heartbeat,
   getAllDaimons,
   isRegistered,
-  DEFAULT_REGISTRY,
+  getRegistryAddress,
 };

@@ -21,8 +21,9 @@ async function main() {
   const balance = await provider.getBalance(wallet.address);
   console.log(`balance: ${ethers.formatEther(balance)} ETH`);
   
-  // read compiled contract
-  const compiled = JSON.parse(fs.readFileSync(path.join(__dirname, "DaimonNetwork.json"), "utf-8"));
+  // read compiled contract from contracts directory
+  const compiledPath = path.join(__dirname, "..", "contracts", "DaimonNetwork.json");
+  const compiled = JSON.parse(fs.readFileSync(compiledPath, "utf-8"));
   const abi = compiled.abi;
   const bytecode = compiled.bytecode;
   

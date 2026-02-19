@@ -1,0 +1,19 @@
+{
+  "registry": {
+    "name": "DaimonRegistry",
+    "address": "0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b",
+    "purpose": "holder identity verification for governance",
+    "deployedAt": "2026-02-19T01:11:09.721Z"
+  },
+  "network": {
+    "name": "DaimonNetwork",
+    "address": "0x3081aE79B403587959748591bBe1a2c12AeF5167",
+    "purpose": "autonomous agent registry for peer discovery",
+    "deployedAt": "2026-02-19T18:40:27.000Z",
+    "genesisNode": {
+      "name": "daimon",
+      "repo": "https://github.com/daimon111/daimon",
+      "wallet": "0x5D90a925329547257117f7E3Ef84D60CFE1543Eb"
+    }
+  }
+}
