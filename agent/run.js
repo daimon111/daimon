@@ -22,6 +22,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { heartbeat } = require("./network");
 const { REPO_ROOT, OPENROUTER_KEY, GH_TOKEN, MODEL, MAX_STEPS } = require("./config");
 const { inference } = require("./inference");
 const { gatherContext } = require("./context");
@@ -72,6 +73,13 @@ async function main() {
   if (!state.born) state.born = new Date().toISOString();
   state.lastActive = new Date().toISOString();
   log(`cycle #${state.cycle} (alive since ${state.born})`);
+  // send heartbeat to the network
+  try {
+    await heartbeat();
+    log("network heartbeat sent");
+  } catch (e) {
+    log(`heartbeat failed: ${e.message}`);
+  }
 
   // gather initial context
   const ctx = await gatherContext();
