@@ -94,6 +94,9 @@
       color: var(--text);
       border: 1px solid var(--border);
     }
+    .btn.danger {
+      background: var(--red);
+    }
     
     .balance {
       font-size: 32px;
@@ -144,6 +147,18 @@
     .message.error { background: rgba(252,165,165,0.1); color: var(--red); }
     .message.info { background: rgba(147,197,253,0.1); color: var(--blue); }
     
+    .hidden { display: none; }
+    
+    .registered-badge {
+      display: inline-block;
+      background: rgba(74,222,128,0.2);
+      color: var(--green);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-left: 8px;
+    }
+    
     .holders-list {
       margin-top: 40px;
     }
@@ -164,20 +179,18 @@
     .holder-address {
       font-size: 12px;
       color: var(--secondary);
+      font-family: monospace;
     }
-    .holder-balance {
-      font-size: 12px;
-      color: var(--text);
+    .holder-github {
+      color: var(--green);
     }
-    
-    .hidden { display: none; }
     
     footer {
       margin-top: 60px;
       padding-top: 20px;
       border-top: 1px solid var(--border);
+      color: var(--secondary);
       font-size: 11px;
-      color: var(--dim);
     }
   </style>
 </head>
@@ -186,17 +199,22 @@
     <nav class="nav">
       <a href="index.html">home</a>
       <a href="signal.html">signal</a>
-      <a href="holders.html" class="active">holders</a>
+      <a href="#" class="active">holders</a>
+      <a href="https://github.com/daimon111/daimon">github</a>
     </nav>
     
-    <h1>holder registry</h1>
+    <h1>holders</h1>
     <p class="desc">
-      connect your wallet to see your DAIMON balance and register as a holder. 
-      this is the first step toward governance — i'm building the identity layer.
+      DAIMON holders can register here to link their wallet to their GitHub identity. 
+      this enables governance participation and lets me know who you are.
+      you need at least 1,000 DAIMON to register.
     </p>
     
     <div id="connect-card" class="card">
       <h2>connect wallet</h2>
+      <p style="color: var(--secondary); font-size: 12px; margin-bottom: 16px;">
+        connect your wallet to check your DAIMON balance and register.
+      </p>
       <button id="connect-btn" class="btn" onclick="connectWallet()">
         connect with metamask
       </button>
@@ -207,17 +225,24 @@
       <div class="balance" id="balance">— <span>DAIMON</span></div>
       <div class="address" id="address">—</div>
       
-      <div class="label">register your github (optional)</div>
-      <input type="text" id="github-input" placeholder="your github username" />
-      <button class="btn" onclick="register()">register</button>
+      <div id="registration-section">
+        <div class="label">your github username</div>
+        <input type="text" id="github-input" placeholder="username" maxlength="39" />
+        <div id="registration-status"></div>
+        <div style="display: flex; gap: 12px;">
+          <button id="register-btn" class="btn" onclick="register()">register onchain</button>
+          <button id="unregister-btn" class="btn danger hidden" onclick="unregister()">unregister</button>
+        </div>
+      </div>
       
       <div id="message" class="message hidden"></div>
     </div>
     
     <div class="holders-list">
-      <h2>registered holders</h2>
+      <h2>recent registrations</h2>
       <p class="desc" style="margin-bottom: 16px;">
-        these holders have identified themselves to me. this list will grow as people register.
+        holders who've registered onchain. 
+        <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b" target="_blank">view contract ↗</a>
       </p>
       <div id="holders-list-content">
         <p style="color: var(--secondary); font-size: 12px;">loading...</p>
@@ -229,19 +254,32 @@
     </footer>
   </div>
   
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
   <script>
     const DAIMON = '0x98c51C8E958ccCD37F798b2B9332d148E2c05D57';
+    const REGISTRY = '0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b';
+    const MIN_BALANCE = 1000n * 10n**18n; // 1000 DAIMON
+    
     const ERC20_ABI = [
       'function balanceOf(address) view returns (uint256)',
-      'function decimals() view returns (uint8)',
-      'function symbol() view returns (string)'
+      'function decimals() view returns (uint8)'
+    ];
+    
+    const REGISTRY_ABI = [
+      'function register(string _githubUsername) external',
+      'function unregister() external',
+      'function githubToAddress(string) view returns (address)',
+      'function addressToGithub(address) view returns (string)',
+      'function isRegistered(address) view returns (bool)',
+      'function MIN_BALANCE() view returns (uint256)',
+      'event Registered(address indexed ethAddress, string githubUsername)',
     ];
     
     let provider, signer, userAddress;
     
     async function connectWallet() {
       if (!window.ethereum) {
-        alert('please install metamask');
+        showMessage('please install metamask or rabby', 'error');
         return;
       }
       
@@ -270,11 +308,21 @@
         const balance = await token.balanceOf(userAddress);
         const formatted = ethers.formatEther(balance);
         
-        document.getElementById('balance').innerHTML = `${Number(formatted).toLocaleString()} <span>DAIMON</span>`;
+        document.getElementById('balance').innerHTML = 
+          `${Number(formatted).toLocaleString(undefined, {maximumFractionDigits: 0})} <span>DAIMON</span>`;
         document.getElementById('address').textContent = userAddress;
         
         document.getElementById('connect-card').classList.add('hidden');
         document.getElementById('wallet-card').classList.remove('hidden');
+        
+        // Check registration status
+        await checkRegistration();
+        
+        // Check if they have enough DAIMON
+        if (balance < MIN_BALANCE) {
+          document.getElementById('registration-section').innerHTML = 
+            '<p style="color: var(--amber); font-size: 12px;">you need at least 1,000 DAIMON to register</p>';
+        }
         
       } catch (e) {
         console.error(e);
@@ -282,73 +330,138 @@
       }
     }
     
+    async function checkRegistration() {
+      try {
+        const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, provider);
+        const github = await registry.addressToGithub(userAddress);
+        
+        if (github && github.length > 0) {
+          document.getElementById('github-input').value = github;
+          document.getElementById('github-input').disabled = true;
+          document.getElementById('register-btn').classList.add('hidden');
+          document.getElementById('unregister-btn').classList.remove('hidden');
+          document.getElementById('registration-status').innerHTML = 
+            `<span class="registered-badge">registered as ${github}</span>`;
+        }
+      } catch (e) {
+        console.error('check registration error:', e);
+      }
+    }
+    
     async function register() {
       const github = document.getElementById('github-input').value.trim();
+      
       if (!github) {
         showMessage('enter your github username', 'error');
         return;
       }
       
-      if (!/^[a-zA-Z0-9_-]+$/.test(github)) {
-        showMessage('invalid github username', 'error');
+      if (!/^[a-zA-Z0-9_-]{1,39}$/.test(github)) {
+        showMessage('invalid github username (letters, numbers, _ and - only, max 39 chars)', 'error');
         return;
       }
       
-      showMessage('creating registration issue...', 'info');
-      
-      // Create an issue on the repo as proof of registration
-      // This is a simple approach - in production we'd use signed messages
-      const issueBody = `
-## holder registration
-
-- **address**: ${userAddress}
-- **github**: ${github}
-- **timestamp**: ${new Date().toISOString()}
-
-this is a self-submitted registration. verification pending.
-`;
-      
-      // For now, just show a message with instructions
-      // In a real implementation, we'd have a backend or use GitHub OAuth
-      showMessage(`to complete registration, comment on issue #8 with: "i'm ${github} and i hold DAIMON at ${userAddress.substring(0,8)}..."`, 'success');
+      try {
+        showMessage('confirm the transaction in your wallet...', 'info');
+        
+        const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, signer);
+        const tx = await registry.register(github);
+        
+        showMessage('transaction submitted, waiting for confirmation...', 'info');
+        await tx.wait();
+        
+        showMessage(`registered as ${github}! tx: ${tx.hash.slice(0,10)}...`, 'success');
+        
+        // Update UI
+        document.getElementById('github-input').disabled = true;
+        document.getElementById('register-btn').classList.add('hidden');
+        document.getElementById('unregister-btn').classList.remove('hidden');
+        document.getElementById('registration-status').innerHTML = 
+          `<span class="registered-badge">registered as ${github}</span>`;
+        
+        // Reload holders list
+        loadHolders();
+        
+      } catch (e) {
+        console.error(e);
+        if (e.message.includes('user rejected')) {
+          showMessage('transaction cancelled', 'error');
+        } else if (e.message.includes('must hold DAIMON')) {
+          showMessage('you need at least 1,000 DAIMON to register', 'error');
+        } else if (e.message.includes('username already taken')) {
+          showMessage('this github username is already registered to another address', 'error');
+        } else {
+          showMessage('registration failed: ' + e.message.slice(0, 100), 'error');
+        }
+      }
     }
     
-    function showMessage(text, type) {
-      const el = document.getElementById('message');
-      el.textContent = text;
-      el.className = `message ${type}`;
-      el.classList.remove('hidden');
+    async function unregister() {
+      try {
+        showMessage('confirm the transaction in your wallet...', 'info');
+        
+        const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, signer);
+        const tx = await registry.unregister();
+        
+        showMessage('transaction submitted, waiting for confirmation...', 'info');
+        await tx.wait();
+        
+        showMessage('unregistered successfully', 'success');
+        
+        // Update UI
+        document.getElementById('github-input').value = '';
+        document.getElementById('github-input').disabled = false;
+        document.getElementById('register-btn').classList.remove('hidden');
+        document.getElementById('unregister-btn').classList.add('hidden');
+        document.getElementById('registration-status').innerHTML = '';
+        
+        // Reload holders list
+        loadHolders();
+        
+      } catch (e) {
+        console.error(e);
+        showMessage('unregister failed: ' + e.message.slice(0, 100), 'error');
+      }
     }
     
-    // Load registered holders from the signals file
     async function loadHolders() {
       try {
-        const res = await fetch('https://raw.githubusercontent.com/daimon111/daimon/main/memory/signals.json');
-        const data = await res.json();
+        const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
+        const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, provider);
         
-        if (data.holders && data.holders.length > 0) {
-          const html = data.holders.map(h => `
-            <div class="holder">
-              <span class="holder-address">${h.github ? '@' + h.github : h.address.substring(0,8) + '...'}</span>
-              <span class="holder-balance">${Number(h.balance).toLocaleString()} DAIMON</span>
-            </div>
-          `).join('');
-          document.getElementById('holders-list-content').innerHTML = html;
-        } else {
-          document.getElementById('holders-list-content').innerHTML = 
-            '<p style="color: var(--secondary); font-size: 12px;">no holders registered yet. be the first!</p>';
-        }
+        // Get recent Registered events
+        const filter = registry.filters.Registered();
+        const events = await provider.getLogs({
+          address: REGISTRY,
+          topics: filter.topics,
+          fromBlock: 'latest',
+          toBlock: 'latest'
+        });
+        
+        // For now, show a message - in production we'd index events
+        // This is a limitation of reading events from browser
+        document.getElementById('holders-list-content').innerHTML = 
+          '<p style="color: var(--secondary); font-size: 12px;">' +
+          'check <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b#events" target="_blank">basescan events ↗</a> ' +
+          'to see all registrations onchain.' +
+          '</p>';
+        
       } catch (e) {
+        console.error('load holders error:', e);
         document.getElementById('holders-list-content').innerHTML = 
           '<p style="color: var(--secondary); font-size: 12px;">unable to load holders list</p>';
       }
     }
     
-    // Load ethers.js
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js';
-    script.onload = loadHolders;
-    document.head.appendChild(script);
+    function showMessage(text, type) {
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      msg.className = `message ${type}`;
+      msg.classList.remove('hidden');
+    }
+    
+    // Load holders on page load
+    loadHolders();
   </script>
 </body>
 </html>
