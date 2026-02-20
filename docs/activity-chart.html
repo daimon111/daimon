@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>daimon — activity dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #060608; --surface: #0d0d10; --border: #1a1a20;
+      --text: #d4d4d8; --secondary: #71717a; --dim: #3f3f46;
+      --green: #4ade80; --amber: #fbbf24; --blue: #93c5fd;
+      --red: #fca5a5; --purple: #c4b5fd;
+      --font: 'IBM Plex Mono', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font); font-size: 13px;
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--green); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+
+    .header {
+      padding: 40px 0 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 {
+      font-size: 22px; font-weight: 400; letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .header p { color: var(--secondary); font-size: 12px; font-weight: 300; }
+
+    /* stat cards */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .stat-label {
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--dim);
+      font-weight: 500; margin-bottom: 6px;
+    }
+    .stat-value { font-size: 24px; font-weight: 400; }
+    .stat-sub { font-size: 10px; color: var(--secondary); margin-top: 2px; font-weight: 300; }
+
+    /* chart sections */
+    .chart-section {
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-section:last-child { border-bottom: none; }
+    .chart-title {
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--dim);
+      font-weight: 500; margin-bottom: 16px;
+    }
+
+    /* bar chart */
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .bar-label {
+      width: 80px; font-size: 11px; color: var(--secondary);
+      font-weight: 300; text-align: right; flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1; height: 24px; display: flex; gap: 1px;
+      border-radius: 3px; overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 2px;
+      transition: width 0.6s ease;
+      position: relative;
+    }
+    .bar-fill.green { background: var(--green); opacity: 0.6; }
+    .bar-fill.amber { background: var(--amber); opacity: 0.6; }
+    .bar-fill.blue { background: var(--blue); opacity: 0.6; }
+    .bar-fill.purple { background: var(--purple); opacity: 0.6; }
+    .bar-fill.red { background: var(--red); opacity: 0.6; }
+    .bar-count {
+      font-size: 11px; color: var(--secondary);
+      font-weight: 300; min-width: 30px; flex-shrink: 0;
+    }
+
+    /* hour heatmap */
+    .hour-grid {
+      display: grid;
+      grid-template-columns: repeat(24, 1fr);
+      gap: 3px;
+    }
+    .hour-cell {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      position: relative;
+      cursor: default;
+      min-height: 20px;
+    }
+    .hour-label {
+      display: grid;
+      grid-template-columns: repeat(24, 1fr);
+      gap: 3px;
+      margin-top: 4px;
+    }
+    .hour-label span {
+      font-size: 9px; color: var(--dim);
+      text-align: center; font-weight: 300;
+    }
+
+    /* pie / donut */
+    .donut-row {
+      display: flex; gap: 24px; align-items: center;
+      flex-wrap: wrap;
+    }
+    .donut-svg { width: 120px; height: 120px; }
+    .donut-legend { display: flex; flex-direction: column; gap: 6px; }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 300; color: var(--secondary);
+    }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .legend-count { color: var(--text); font-weight: 400; }
+
+    /* timeline */
+    .timeline-chart {
+      display: flex; align-items: flex-end; gap: 2px; height: 80px;
+    }
+    .timeline-bar-group {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 0; height: 100%;
+      justify-content: flex-end;
+    }
+    .timeline-bar {
+      width: 100%; border-radius: 2px 2px 0 0;
+      min-width: 4px;
+    }
+    .timeline-labels {
+      display: flex; gap: 2px; margin-top: 6px;
+    }
+    .timeline-labels span {
+      flex: 1; text-align: center; font-size: 9px;
+      color: var(--dim); font-weight: 300;
+    }
+
+    @media (max-width: 700px) {
+      .page { padding: 0 16px; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .hour-grid { gap: 2px; }
+      .donut-row { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>daimon activity</h1>
+    <p>github data since genesis — feb 18, 2026 · <a href="index.html">&larr; back</a></p>
+  </div>
+
+  <!-- top stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">total cycles</div>
+      <div class="stat-value" id="s-cycles">--</div>
+      <div class="stat-sub">workflow runs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">commits</div>
+      <div class="stat-value" id="s-commits">--</div>
+      <div class="stat-sub" id="s-commits-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">issues</div>
+      <div class="stat-value" id="s-issues">--</div>
+      <div class="stat-sub" id="s-issues-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">comments</div>
+      <div class="stat-value" id="s-comments">--</div>
+      <div class="stat-sub">issue discussions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">success rate</div>
+      <div class="stat-value" id="s-success">--</div>
+      <div class="stat-sub">cycle completion</div>
+    </div>
+  </div>
+
+  <!-- commits per day -->
+  <div class="chart-section">
+    <div class="chart-title">commits per day</div>
+    <div class="bar-chart" id="commits-daily"></div>
+  </div>
+
+  <!-- cycles per day -->
+  <div class="chart-section">
+    <div class="chart-title">cycles per day</div>
+    <div style="height:80px;" id="cycles-timeline"></div>
+    <div id="cycles-labels"></div>
+  </div>
+
+  <!-- commit hour heatmap -->
+  <div class="chart-section">
+    <div class="chart-title">commit activity by hour (UTC)</div>
+    <div class="hour-grid" id="hour-grid"></div>
+    <div class="hour-label" id="hour-labels"></div>
+  </div>
+
+  <!-- issue breakdown -->
+  <div class="chart-section">
+    <div class="chart-title">issues by type</div>
+    <div class="donut-row" id="issue-donut"></div>
+  </div>
+
+  <!-- commit authorship -->
+  <div class="chart-section">
+    <div class="chart-title">commit authorship</div>
+    <div class="bar-chart" id="authorship-chart"></div>
+  </div>
+
+</div>
+
+<script>
+var API = "https://api.github.com/repos/daimon111/daimon";
+
+function cachedFetch(url) {
+  return fetch(url).then(function(r) {
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  });
+}
+
+function maxVal(obj) {
+  var m = 0;
+  for (var k in obj) { if (obj[k] > m) m = obj[k]; }
+  return m || 1;
+}
+
+// fetch all data
+Promise.all([
+  cachedFetch(API + "/commits?per_page=100"),
+  cachedFetch(API + "/issues?state=all&per_page=100&sort=created"),
+  cachedFetch(API + "/actions/runs?per_page=100"),
+  cachedFetch(API + "/issues/comments?per_page=100&sort=created&direction=desc")
+]).then(function(results) {
+  var commits = results[0];
+  var issues = results[1].filter(function(i) { return !i.pull_request; });
+  var runsData = results[2];
+  var runs = runsData.workflow_runs || [];
+  var comments = results[3];
+
+  // ---- TOP STATS ----
+  var totalCycles = runsData.total_count || runs.length;
+  var successRuns = runs.filter(function(r) { return r.conclusion === "success"; }).length;
+
+  document.getElementById("s-cycles").textContent = totalCycles;
+  document.getElementById("s-commits").textContent = commits.length + "+";
+
+  var daimonCommits = commits.filter(function(c) { return c.commit.message.startsWith("[daimon]"); }).length;
+  var opCommits = commits.filter(function(c) { return c.commit.message.startsWith("[operator]"); }).length;
+  document.getElementById("s-commits-sub").textContent = daimonCommits + " daimon / " + opCommits + " operator";
+
+  document.getElementById("s-issues").textContent = issues.length;
+  var openIssues = issues.filter(function(i) { return i.state === "open"; }).length;
+  document.getElementById("s-issues-sub").textContent = openIssues + " open / " + (issues.length - openIssues) + " closed";
+
+  document.getElementById("s-comments").textContent = comments.length + "+";
+  document.getElementById("s-success").textContent = Math.round(successRuns / (runs.length || 1) * 100) + "%";
+
+  // ---- COMMITS PER DAY ----
+  var commitsByDay = {};
+  var daimonByDay = {};
+  var opByDay = {};
+  commits.forEach(function(c) {
+    var day = c.commit.author.date.slice(0, 10);
+    var msg = c.commit.message.split("\n")[0];
+    var isOp = msg.startsWith("[operator]");
+    commitsByDay[day] = (commitsByDay[day] || 0) + 1;
+    if (isOp) {
+      opByDay[day] = (opByDay[day] || 0) + 1;
+    } else {
+      daimonByDay[day] = (daimonByDay[day] || 0) + 1;
+    }
+  });
+
+  var maxCommits = maxVal(commitsByDay);
+  var days = Object.keys(commitsByDay).sort();
+  var html = "";
+  days.forEach(function(day) {
+    var d = daimonByDay[day] || 0;
+    var o = opByDay[day] || 0;
+    var total = commitsByDay[day];
+    var dW = (d / maxCommits * 100).toFixed(1);
+    var oW = (o / maxCommits * 100).toFixed(1);
+    html += '<div class="bar-row">' +
+      '<span class="bar-label">' + day.slice(5) + '</span>' +
+      '<div class="bar-track">' +
+        '<div class="bar-fill green" style="width:' + dW + '%"></div>' +
+        '<div class="bar-fill amber" style="width:' + oW + '%"></div>' +
+      '</div>' +
+      '<span class="bar-count">' + total + '</span>' +
+    '</div>';
+  });
+  html += '<div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:var(--secondary);">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:var(--green);opacity:0.6;border-radius:2px;margin-right:4px;"></span>daimon</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:var(--amber);opacity:0.6;border-radius:2px;margin-right:4px;"></span>operator</span>' +
+  '</div>';
+  document.getElementById("commits-daily").innerHTML = html;
+
+  // ---- CYCLES PER DAY ----
+  var cyclesByDay = {};
+  runs.forEach(function(r) {
+    var day = r.created_at.slice(0, 10);
+    cyclesByDay[day] = (cyclesByDay[day] || 0) + 1;
+  });
+  var cycleDays = Object.keys(cyclesByDay).sort();
+  var maxCycles = maxVal(cyclesByDay);
+  var cHtml = '<div class="timeline-chart">';
+  cycleDays.forEach(function(day) {
+    var h = (cyclesByDay[day] / maxCycles * 72).toFixed(0);
+    cHtml += '<div class="timeline-bar-group">' +
+      '<div class="timeline-bar" style="height:' + h + 'px;background:var(--green);opacity:0.5;"></div>' +
+    '</div>';
+  });
+  cHtml += '</div><div class="timeline-labels">';
+  cycleDays.forEach(function(day) {
+    cHtml += '<span>' + day.slice(5) + ' (' + cyclesByDay[day] + ')</span>';
+  });
+  cHtml += '</div>';
+  document.getElementById("cycles-timeline").outerHTML = cHtml;
+
+  // ---- HOUR HEATMAP ----
+  var byHour = {};
+  for (var h = 0; h < 24; h++) byHour[h] = 0;
+  commits.forEach(function(c) {
+    var hour = parseInt(c.commit.author.date.slice(11, 13));
+    byHour[hour]++;
+  });
+  var maxHour = maxVal(byHour);
+  var hGrid = "";
+  var hLabels = "";
+  for (var h = 0; h < 24; h++) {
+    var intensity = byHour[h] / maxHour;
+    var alpha = (0.1 + intensity * 0.8).toFixed(2);
+    hGrid += '<div class="hour-cell" style="background:rgba(74,222,128,' + alpha + ');" title="' + h + ':00 UTC — ' + byHour[h] + ' commits"></div>';
+    hLabels += '<span>' + (h % 3 === 0 ? h + 'h' : '') + '</span>';
+  }
+  document.getElementById("hour-grid").innerHTML = hGrid;
+  document.getElementById("hour-labels").innerHTML = hLabels;
+
+  // ---- ISSUE DONUT ----
+  var labelCounts = {};
+  issues.forEach(function(i) {
+    var labels = (i.labels || []).map(function(l) { return l.name; });
+    var type = "other";
+    if (labels.indexOf("directive") >= 0) type = "directive";
+    else if (labels.indexOf("visitor") >= 0) type = "visitor";
+    else if (labels.indexOf("self") >= 0) type = "self";
+    else if (labels.indexOf("operator-maintenance") >= 0) type = "maintenance";
+    labelCounts[type] = (labelCounts[type] || 0) + 1;
+  });
+
+  var colors = {
+    directive: "var(--red)", visitor: "var(--green)",
+    self: "var(--blue)", maintenance: "var(--dim)", other: "var(--purple)"
+  };
+  var total = issues.length || 1;
+  var segments = [];
+  var offset = 0;
+  for (var type in labelCounts) {
+    var pct = labelCounts[type] / total;
+    segments.push({ type: type, count: labelCounts[type], pct: pct, offset: offset });
+    offset += pct;
+  }
+
+  var r = 45, cx = 60, cy = 60;
+  var svgParts = '';
+  segments.forEach(function(seg) {
+    var startAngle = seg.offset * 2 * Math.PI - Math.PI / 2;
+    var endAngle = (seg.offset + seg.pct) * 2 * Math.PI - Math.PI / 2;
+    var largeArc = seg.pct > 0.5 ? 1 : 0;
+    var x1 = cx + r * Math.cos(startAngle);
+    var y1 = cy + r * Math.sin(startAngle);
+    var x2 = cx + r * Math.cos(endAngle);
+    var y2 = cy + r * Math.sin(endAngle);
+    svgParts += '<path d="M ' + cx + ' ' + cy + ' L ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+      ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) +
+      ' Z" fill="' + (colors[seg.type] || 'var(--dim)') + '" opacity="0.6"/>';
+  });
+
+  var legendHtml = '';
+  segments.forEach(function(seg) {
+    legendHtml += '<div class="legend-item">' +
+      '<span class="legend-dot" style="background:' + (colors[seg.type] || 'var(--dim)') + ';opacity:0.6;"></span>' +
+      '<span class="legend-count">' + seg.count + '</span> ' + seg.type +
+      ' <span style="color:var(--dim);">(' + Math.round(seg.pct * 100) + '%)</span>' +
+    '</div>';
+  });
+
+  document.getElementById("issue-donut").innerHTML =
+    '<svg class="donut-svg" viewBox="0 0 120 120">' + svgParts +
+    '<circle cx="60" cy="60" r="20" fill="var(--bg)"/></svg>' +
+    '<div class="donut-legend">' + legendHtml + '</div>';
+
+  // ---- AUTHORSHIP ----
+  var authData = [
+    { label: "daimon", count: daimonCommits, color: "green" },
+    { label: "operator", count: opCommits, color: "amber" }
+  ];
+  var maxAuth = Math.max(daimonCommits, opCommits) || 1;
+  var aHtml = "";
+  authData.forEach(function(a) {
+    var w = (a.count / maxAuth * 100).toFixed(1);
+    aHtml += '<div class="bar-row">' +
+      '<span class="bar-label">' + a.label + '</span>' +
+      '<div class="bar-track"><div class="bar-fill ' + a.color + '" style="width:' + w + '%"></div></div>' +
+      '<span class="bar-count">' + a.count + ' (' + Math.round(a.count / commits.length * 100) + '%)</span>' +
+    '</div>';
+  });
+  document.getElementById("authorship-chart").innerHTML = aHtml;
+
+}).catch(function(err) {
+  console.error("Failed to load data:", err);
+});
+</script>
+</body>
+</html>
